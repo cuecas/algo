@@ -3,6 +3,8 @@ import random
 BOARD_ROW_LENGTH = 10
 BOARD_COLUMN_LENGTH = 10
 
+MAX_TRIES_TO_PUT_WORD = 20
+
 WORD_ALLOWED_DIRECTIONS = [
     "vertical_up",
     "vertical_down",
@@ -14,8 +16,29 @@ WORD_ALLOWED_DIRECTIONS = [
     "diagonal_down_right"
 ]
 
-def new_game(words: list):
-    return None
+WORDS_PATH = "words.txt"
+
+def new_game():
+    board = build_board()
+
+    for word in load_words():
+        direction = get_new_direction()
+        match generate_random_position_to_put(board, direction, word):
+          case None:
+            board
+          case (row, column):
+            board = put_on_board(board, row, column, direction, word)
+
+    return board
+
+def load_words() -> list:
+    accumulator = []
+    with open(WORDS_PATH, "r") as reader:
+        for word in str(reader.read()).split("\n"):
+            if word:
+                accumulator.append(word)
+
+    return accumulator
 
 def build_board() -> list:
     board = []
@@ -31,7 +54,7 @@ def visualize_board(board: list) -> None:
     for i in board:
         print(i)
 
-def get_new_position() -> tuple:
+def generate_new_position() -> tuple:
     row = random.randint(0, BOARD_ROW_LENGTH - 1)
     column = random.randint(0, BOARD_COLUMN_LENGTH - 1)
     return (row, column)
@@ -55,49 +78,52 @@ def put_on_board(board: list, row: int, column: int, direction: int, word: str) 
             tail
         )
 
-def generate_random_position_to_put(board: list, direction: str, word: str) -> tuple:
-    (row, column) = get_new_position()
-
-    if board[row][column]:
-        if direction_is_been_used(board, row, column, direction):
-            return generate_random_position_to_put(board, direction, word)
+def generate_random_position_to_put(board: list, direction: str, word: str, tries: int = 1):
+    (row, column) = generate_new_position()
+    
+    direction_is_used = direction_is_been_used(board, row, column, direction)
+    word_fit = is_word_fit(board, row, column, direction, word)
+    
+    if not direction_is_used and word_fit:
+        if there_is_any_words_on_the_way(board, row, column, direction, word):
+            # TODO: algoritmo de cruzamento
+            return (row, column)
         else:
             return (row, column)
-    elif is_word_fit(board, row, column, direction, word):
-        return (row, column)
     else:
-        return generate_random_position_to_put(board, direction, word)
+        return (
+            None if tries == MAX_TRIES_TO_PUT_WORD
+            else generate_random_position_to_put(board, direction, word, tries + 1)
+        )
+
+def there_is_any_words_on_the_way(board, row, column, direction, word):
+    word_len = len(word) - 1
+
+    for number in range(0, word_len):
+        next_row = next_row_indice(row, direction, number)
+        next_column = next_column_indice(column, direction, number)
+
+        if next_row_is_exceeded(next_row) or next_column_is_exceeded(next_column):
+           return False 
+        elif board[next_row][next_column]:
+            return True
 
 def is_word_fit(board: list, row: int, column: int, direction: str, word: str) -> bool:
-    word_len = len(word) - 1
+    word_len = len(word)
     last_row_index = next_row_indice(row, direction, times=word_len)
     last_column_index = next_column_indice(column, direction, times=word_len)
-
-    if direction in ["vertical_up"]:
-        return last_row_index > 0
-    elif direction in ["vertical_down"]:
-        return last_row_index < BOARD_ROW_LENGTH
-    elif direction in ["horizontal_right"]:
-        return last_column_index < BOARD_COLUMN_LENGTH
-    elif direction in ["horizontal_left"]:
-        return last_column_index >= 0
-    elif direction in ["diagonal_up_left"]:
-        return last_row_index >= 0 and last_column_index > 0
-    elif direction in ["diagonal_up_right"]:
-        return last_row_index >= 0 and last_column_index < BOARD_COLUMN_LENGTH
-    elif direction in ["diagonal_down_left"]:
-        return last_row_index < BOARD_ROW_LENGTH and last_column_index > 0
-    elif direction in ["diagonal_down_right"]:
-        return last_row_index < BOARD_ROW_LENGTH and last_column_index < BOARD_COLUMN_LENGTH
+    return not next_row_is_exceeded(last_row_index) and not next_column_is_exceeded(last_column_index)
 
 def direction_is_been_used(board: list, row: int, column: int, direction: str) -> list:
-    return board[next_row_indice(direction, row)][next_column_indice(direction, column)]
+    next_row = next_row_indice(row, direction)
+    next_column = next_column_indice(column, direction)
 
-def put_on_direction(word: str, board: list, start_row: int, start_column: int, direction: str):
-    for l in word:
-        return None
+    if next_row_is_exceeded(next_row) or next_column_is_exceeded(next_column):
+        return False
 
-def next_row_indice(row: str, direction: str, times=1):
+    return board[next_row][next_column]
+
+def next_row_indice(row: str, direction: str, times: int = 1):
     if direction in ["vertical_up", "diagonal_up_left", "diagonal_up_right"]:
         return row - times
     elif direction in ["vertical_down", "diagonal_down_left", "diagonal_down_right"]:
@@ -105,9 +131,9 @@ def next_row_indice(row: str, direction: str, times=1):
     elif direction in ["horizontal_left", "horizontal_right"]:
         return row
     else:
-        raise RuntimeError("wrong direction - got: " + direction)
+        raise RuntimeError("wrong direction - got: {}".format(direction))
 
-def next_column_indice(column: int, direction: str, times=1):
+def next_column_indice(column: int, direction: str, times: int = 1):
     if direction in ["vertical_up", "vertical_down"]:
         return column
     elif direction in ["horizontal_left", "diagonal_up_left", "diagonal_down_left"]:
@@ -115,12 +141,13 @@ def next_column_indice(column: int, direction: str, times=1):
     elif direction in ["horizontal_right", "diagonal_up_right", "diagonal_down_right"]:
         return column + times
     else:
-        raise RuntimeError("wrong direction - got: " + direction)
+        raise RuntimeError("wrong direction - got: " + str(direction))
 
-## Tests
-board = build_board()
-direction = get_new_direction()
-word = "carlao"
-(row, column) = generate_random_position_to_put(board, direction, word)
-board = put_on_board(board, row, column, direction, word)
+def next_row_is_exceeded(row):
+    return row >= BOARD_ROW_LENGTH or row < 0
+
+def next_column_is_exceeded(column):
+    return column >= BOARD_COLUMN_LENGTH or column < 0
+
+board = new_game()
 visualize_board(board)
