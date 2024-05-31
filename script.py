@@ -1,11 +1,9 @@
 import random
 
-BOARD_ROW_LENGTH = 10
-BOARD_COLUMN_LENGTH = 10
+BOARD_ROW_LENGTH = 15
+BOARD_COLUMN_LENGTH = 15
 
 MAX_TRIES_TO_PUT_WORD = BOARD_ROW_LENGTH * BOARD_COLUMN_LENGTH
-
-## TODO: ARRUMAR EM TODOS OS LUGARES `position` 
 
 WORD_ALLOWED_DIRECTIONS = [
     "vertical_up",
@@ -22,14 +20,13 @@ WORDS_PATH = "words.txt"
 
 def new_game():
     board = build_board()
-    positions = [] # only for future cache
+    positions = [] ## only for future cache
     used_words = []
     (words, helpers) = load_words()
 
     for word in words:
         match try_generate_random_position_to_put(board,  word):
           case ("obstacles", obstacles, position, word):
-            print("obstacles: " + "word: " + word + " " + str(obstacles) + " position: " + str(position))
             match find_match_word(board, obstacles, position, helpers):
               case ("match_word", match_word, position):
                 positions.append({word: position})
@@ -57,12 +54,10 @@ def find_match_word(board: list, obstacles: list, position: dict, helper_words: 
 
 
     if counter == len(obstacles):
-        print("DEU MATCH: " + str(head))
         return ("match_word", head, position)
     else:
         return find_match_word(board, obstacles, position, helper_words[1:])
 
-## Dar shuffle e pegar apenas algumas palavras, deixar outras de step
 def load_words() -> list:
     accumulator = []
     with open(WORDS_PATH, "r") as reader:
@@ -71,7 +66,7 @@ def load_words() -> list:
                 accumulator.append(word)
 
     random.shuffle(accumulator)
-    principal = accumulator[0:4]
+    principal = accumulator[0:14]
     helpers = [w for w in accumulator if w not in principal]
 
     return (principal, helpers)
@@ -113,9 +108,8 @@ def put_on_board(board: list, position: dict, word: str) -> list:
 def try_generate_random_position_to_put(board: list, word: str, tries: list = []):
     position = new_position()
 
-    ## cache
+    ## memoization
     if position in tries:
-        ## TODO: em X tentativas, tentar dar merge com alguma palavra para não perder ela
         return (
             None if len(tries) == MAX_TRIES_TO_PUT_WORD
             else try_generate_random_position_to_put(
@@ -152,7 +146,6 @@ def get_obstacles(board, position, word):
         next_row = next_row_index(position, times=index)
         next_column = next_column_index(position, times=index)
         if not next_row_is_exceeded(position) and not next_column_is_exceeded(position):
-            ## O problema está por aqui
             if cell := board[next_row][next_column]:
                 obstacles.append((cell, index))
 
