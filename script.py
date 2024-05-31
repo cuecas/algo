@@ -24,16 +24,18 @@ def new_game():
     board = build_board()
     positions = [] # only for future cache
     used_words = []
-    words = load_words()
+    (words, helpers) = load_words()
 
     for word in words:
         match try_generate_random_position_to_put(board,  word):
           case ("obstacles", obstacles, position, word):
-            match find_match_word(board, obstacles, position, words, used_words):
+            print("obstacles: " + "word: " + word + " " + str(obstacles) + " position: " + str(position))
+            match find_match_word(board, obstacles, position, helpers):
               case ("match_word", match_word, position):
                 positions.append({word: position})
+                helpers.remove(match_word)
                 used_words.append(match_word)
-                board = put_on_board(board, position, word)
+                board = put_on_board(board, position, match_word)
 
           case position:
             positions.append({word: position})
@@ -42,23 +44,25 @@ def new_game():
 
     return (board, positions)
 
-def find_match_word(board: list, obstacles: list, position: dict, words: list, used_words: list):
-    if len(words) == 0:
+def find_match_word(board: list, obstacles: list, position: dict, helper_words: list):
+    if len(helper_words) == 0:
         return None
 
-    head = words[0]    
+    head = helper_words[0]
     counter = 0
     for (obstacle, index) in obstacles:
         word_fit = is_word_fit(board, position, head)
-        if (len(head) - 1) >= index and word_fit and head[index] == obstacle and head not in used_words:
+        if (len(head) - 1) >= index and word_fit and head[index] == obstacle:
             counter = counter + 1
 
 
     if counter == len(obstacles):
+        print("DEU MATCH: " + str(head))
         return ("match_word", head, position)
     else:
-        return find_match_word(board, obstacles, position, words[1:], used_words)
+        return find_match_word(board, obstacles, position, helper_words[1:])
 
+## Dar shuffle e pegar apenas algumas palavras, deixar outras de step
 def load_words() -> list:
     accumulator = []
     with open(WORDS_PATH, "r") as reader:
@@ -66,7 +70,11 @@ def load_words() -> list:
             if word:
                 accumulator.append(word)
 
-    return accumulator
+    random.shuffle(accumulator)
+    principal = accumulator[0:4]
+    helpers = [w for w in accumulator if w not in principal]
+
+    return (principal, helpers)
 
 def build_board() -> list:
     board = []
@@ -141,11 +149,11 @@ def get_obstacles(board, position, word):
     word_len = len(word)
     obstacles = []
     for index in range(0, word_len):
-        next_row = next_row_index(position, index)
-        next_column = next_column_index(position, index)
-
+        next_row = next_row_index(position, times=index)
+        next_column = next_column_index(position, times=index)
         if not next_row_is_exceeded(position) and not next_column_is_exceeded(position):
-            if cell := on_the_board(board, position):
+            ## O problema está por aqui
+            if cell := board[next_row][next_column]:
                 obstacles.append((cell, index))
 
     if len(obstacles) == 0:
@@ -215,13 +223,6 @@ def update_board(board, position, value):
     board[position["row"]][position["column"]] = value
 
 ## position object handle
-def position(row, column, direction):
-    return {
-        "row": row,
-        "column": column,
-        "direction": direction
-    }
-
 def new_position():
     row = random.randint(0, BOARD_ROW_LENGTH - 1)
     column = random.randint(0, BOARD_COLUMN_LENGTH - 1)
