@@ -1,7 +1,12 @@
-import random
+"""
+TODO: glossário dos termos encontrados nesse script
+"""
 
-BOARD_ROW_LENGTH = 15
-BOARD_COLUMN_LENGTH = 15
+import random
+from enum import Enum
+
+BOARD_ROW_LENGTH = 20
+BOARD_COLUMN_LENGTH = 20
 
 MAX_TRIES_TO_PUT_WORD = BOARD_ROW_LENGTH * BOARD_COLUMN_LENGTH
 
@@ -16,34 +21,64 @@ WORD_ALLOWED_DIRECTIONS = [
     "diagonal_down_right"
 ]
 
-WORDS_PATH = "words.txt"
+Tags = Enum('Tags', [
+    'NO_OBSTACLES',
+    'OBSTACLES',
+    'WORD_DOESNT_FIT',
+    'MATCH_WORD',
+    'NO_MATCH_WORD'
+])
 
-def new_game():
+def new_game(loaded_words: tuple):
     board = build_board()
     positions = [] ## only for future cache
-    used_words = []
-    (words, helpers) = load_words()
+    (words, helpers) = loaded_words
 
     for word in words:
-        match try_generate_random_position_to_put(board,  word):
-          case ("obstacles", obstacles, position, word):
-            match find_match_word(board, obstacles, position, helpers):
-              case ("match_word", match_word, position):
-                positions.append({word: position})
-                helpers.remove(match_word)
-                used_words.append(match_word)
-                board = put_on_board(board, position, match_word)
-
-          case position:
-            positions.append({word: position})
-            used_words.append(word)
-            board = put_on_board(board, position, word)
+        recursivelly_try_put_word(board, word, positions, helpers, [])
 
     return (board, positions)
 
+def recursivelly_try_put_word(board: list, word: str, positions: list, helpers: list, tried_positions: str):
+    if len(tried_positions) == MAX_TRIES_TO_PUT_WORD:
+        return None
+    
+    match try_generate_random_position_to_put(board, word):
+      case (Tags.WORD_DOESNT_FIT, tried_position):
+        return recursivelly_try_put_word(board, word, positions, helpers, tried_positions + [tried_position])
+
+      case (Tags.NO_OBSTACLES, position):
+        positions.append({word: position})
+        board = put_on_board(board, position, word)
+
+      case (Tags.OBSTACLES, obstacles, tried_position, word):
+        match handle_obstacles(board, obstacles, tried_position, word, helpers):
+          case Tags.NO_MATCH_WORD:
+            return recursivelly_try_put_word(
+                board,
+                word,
+                positions,
+                helpers,
+                tried_positions + [tried_position]
+            )
+
+
+def handle_obstacles(board: list, obstacles: list, position: dict, word: str, helpers: list):
+    match find_match_word(board, obstacles, position, helpers):
+      case (Tags.MATCH_WORD, match_word, position):
+        positions.append({word: position})
+        helpers.remove(match_word)
+        put_on_board(board, position, match_word)
+
+        return Tags.MATCH_WORD
+
+      case Tags.NO_MATCH_WORD:
+        return Tags.NO_MATCH_WORD
+
+
 def find_match_word(board: list, obstacles: list, position: dict, helper_words: list):
     if len(helper_words) == 0:
-        return None
+        return Tags.NO_MATCH_WORD
 
     head = helper_words[0]
     counter = 0
@@ -57,19 +92,6 @@ def find_match_word(board: list, obstacles: list, position: dict, helper_words: 
         return ("match_word", head, position)
     else:
         return find_match_word(board, obstacles, position, helper_words[1:])
-
-def load_words() -> list:
-    accumulator = []
-    with open(WORDS_PATH, "r") as reader:
-        for word in str(reader.read()).split("\n"):
-            if word:
-                accumulator.append(word)
-
-    random.shuffle(accumulator)
-    principal = accumulator[0:14]
-    helpers = [w for w in accumulator if w not in principal]
-
-    return (principal, helpers)
 
 def build_board() -> list:
     board = []
@@ -105,39 +127,22 @@ def put_on_board(board: list, position: dict, word: str) -> list:
             tail
         )
 
-def try_generate_random_position_to_put(board: list, word: str, tries: list = []):
+## Essa função não deveria se chamar recursivamente
+def try_generate_random_position_to_put(board: list, word: str):
     position = new_position()
-
-    ## memoization
-    if position in tries:
-        return (
-            None if len(tries) == MAX_TRIES_TO_PUT_WORD
-            else try_generate_random_position_to_put(
-                    board,
-                    word,
-                    tries
-            )
-        )
 
     direction_is_used = direction_is_been_used(board, position)
     word_fit = is_word_fit(board, position, word)
 
     if not direction_is_used and word_fit:
          match get_obstacles(board, position, word):
-           case "no_obstacles":
-             return position
+           case Tags.NO_OBSTACLES:
+             return (Tags.NO_OBSTACLES, position)
 
-           case ("obstacles", obstacles):
-             return ("obstacles", obstacles, position, word)
+           case (Tags.OBSTACLES, obstacles):
+             return (Tags.OBSTACLES, obstacles, position, word)
     else:
-        return (
-            None if len(tries) == MAX_TRIES_TO_PUT_WORD
-            else try_generate_random_position_to_put(
-                    board,
-                    word,
-                    tries + [position]
-            )
-        )
+        return (Tags.WORD_DOESNT_FIT, position)
 
 def get_obstacles(board, position, word):
     word_len = len(word)
@@ -150,9 +155,9 @@ def get_obstacles(board, position, word):
                 obstacles.append((cell, index))
 
     if len(obstacles) == 0:
-        return "no_obstacles"
+        return Tags.NO_OBSTACLES
     else:
-        return ("obstacles", obstacles)
+        return (Tags.OBSTACLES, obstacles)
 
 def is_word_fit(board: list, position: dict, word: str) -> bool:
     word_len = len(word)
