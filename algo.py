@@ -1,5 +1,10 @@
 """
-TODO: glossário dos termos encontrados nesse script
+Algoritmo responsável por localizar uma `position` para as palavras passadas para a função `new_game(loaded_words)`.
+Breve glossário do algortimo:
+- `position` - dicionário contendo as chaves: 'row', 'column' e 'direction'
+- `fit` - termo que significa: palavra caber em determinada `position` (caber significa ter o comprimento igual ou menor e a direção não estar sendo usada)
+- `obstacle` - letra que aparece no meio de um `spawn`
+- `spawn` - tentativa de colocar uma palavra no `board`
 """
 
 import random
@@ -52,7 +57,7 @@ def recursivelly_try_put_word(board: list, word: str, positions: list, helpers: 
         board = put_on_board(board, position, word)
 
       case (Tags.OBSTACLES, obstacles, tried_position, word):
-        match handle_obstacles(board, obstacles, tried_position, word, helpers):
+        match handle_obstacles(board, obstacles, positions, tried_position, word, helpers):
           case Tags.NO_MATCH_WORD:
             return recursivelly_try_put_word(
                 board,
@@ -63,7 +68,7 @@ def recursivelly_try_put_word(board: list, word: str, positions: list, helpers: 
             )
 
 
-def handle_obstacles(board: list, obstacles: list, position: dict, word: str, helpers: list):
+def handle_obstacles(board: list, obstacles: list, positions: list, position: dict, word: str, helpers: list):
     match find_match_word(board, obstacles, position, helpers):
       case (Tags.MATCH_WORD, match_word, position):
         positions.append({word: position})
@@ -89,7 +94,7 @@ def find_match_word(board: list, obstacles: list, position: dict, helper_words: 
 
 
     if counter == len(obstacles):
-        return ("match_word", head, position)
+        return (Tags.MATCH_WORD, head, position)
     else:
         return find_match_word(board, obstacles, position, helper_words[1:])
 
@@ -127,7 +132,6 @@ def put_on_board(board: list, position: dict, word: str) -> list:
             tail
         )
 
-## Essa função não deveria se chamar recursivamente
 def try_generate_random_position_to_put(board: list, word: str):
     position = new_position()
 

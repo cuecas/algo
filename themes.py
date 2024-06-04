@@ -11,7 +11,7 @@ from algo import new_game
 import random
 
 WORDS_FOLDER = "words/"
-PRINCIPAL_WORDS_LIMIT = 15 # 15
+PRINCIPAL_WORDS_LIMIT = 20
 
 def animals():
     return new_game(__load_words("animals.txt"))
