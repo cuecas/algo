@@ -11,7 +11,6 @@ from algo import new_game
 import random
 
 WORDS_FOLDER = "words/"
-PRINCIPAL_WORDS_LIMIT = 20
 
 def animals():
     return new_game(__load_words("animals.txt"))
@@ -23,9 +22,5 @@ def __load_words(file: str) -> list:
             if word:
                 accumulator.append(word)
 
-    random.shuffle(accumulator)
-    principal = accumulator[0:PRINCIPAL_WORDS_LIMIT]
-    helpers = [w for w in accumulator if w not in principal]
-
-    return (principal, helpers)
+    return accumulator
 

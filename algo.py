@@ -31,16 +31,37 @@ Tags = Enum('Tags', [
     'OBSTACLES',
     'WORD_DOESNT_FIT',
     'MATCH_WORD',
-    'NO_MATCH_WORD'
+    'NO_MATCH_WORD',
+    'OK',
+    'SUBSTITUTE_WORD'
 ])
 
-def new_game(loaded_words: tuple):
+def new_game(loaded_words: list):
     board = build_board()
     positions = [] ## only for future cache
-    (words, helpers) = loaded_words
-
+    words = loaded_words.copy()
+    helpers = loaded_words.copy()
+    
     for word in words:
-        recursivelly_try_put_word(board, word, positions, helpers, [])
+        helpers_filtered = [w for w in helpers if w != word]
+        
+        match recursivelly_try_put_word(board, word, positions, helpers_filtered, []):
+          case (Tags.OK, word, position):
+            positions.append({word: position})
+            helpers.remove(word) if word in helpers else None
+            board = put_on_board(board, position, word)
+
+          case (Tags.SUBSTITUTE_WORD, substitute_word, position):
+            """
+            Aqui acontece uma troca, a palavra escolhida como "substituta" ou "match" vai ser removida das palavras "helpers" pois já foi usada
+            e será removida do resto das "words" para não ser utilizada novamente. E a palavra que não pode ser encaixada será colocada
+            no final da lista das "words" para tentar ser usada em outro momento.
+            """
+            positions.append({substitute_word: position})
+            helpers.remove(substitute_word)
+            words.append(word)
+            words.remove(substitute_word) if substitute_word in words else None
+            board = put_on_board(board, position, substitute_word)
 
     return (board, positions)
 
@@ -53,8 +74,7 @@ def recursivelly_try_put_word(board: list, word: str, positions: list, helpers: 
         return recursivelly_try_put_word(board, word, positions, helpers, tried_positions + [tried_position])
 
       case (Tags.NO_OBSTACLES, position):
-        positions.append({word: position})
-        board = put_on_board(board, position, word)
+        return (Tags.OK, word, position)
 
       case (Tags.OBSTACLES, obstacles, tried_position, word):
         match handle_obstacles(board, obstacles, positions, tried_position, word, helpers):
@@ -67,15 +87,14 @@ def recursivelly_try_put_word(board: list, word: str, positions: list, helpers: 
                 tried_positions + [tried_position]
             )
 
+          case (Tags.MATCH_WORD, match_word, position):
+            return (Tags.SUBSTITUTE_WORD, match_word, position)
+
 
 def handle_obstacles(board: list, obstacles: list, positions: list, position: dict, word: str, helpers: list):
     match find_match_word(board, obstacles, position, helpers):
       case (Tags.MATCH_WORD, match_word, position):
-        positions.append({word: position})
-        helpers.remove(match_word)
-        put_on_board(board, position, match_word)
-
-        return Tags.MATCH_WORD
+        return (Tags.MATCH_WORD, match_word, position)
 
       case Tags.NO_MATCH_WORD:
         return Tags.NO_MATCH_WORD
